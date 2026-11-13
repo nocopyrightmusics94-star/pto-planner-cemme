@@ -3,8 +3,20 @@
 @tailwind utilities;
 
 @layer base {
+  html {
+    /* Supporto per le aree sicure di iPhone (Notch & Dynamic Island) */
+    padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
+    -webkit-tap-highlight-color: transparent;
+    touch-action: manipulation;
+  }
   body {
     @apply bg-slate-50 text-slate-800 antialiased font-sans;
+    min-height: 100vh;
+    min-height: -webkit-fill-available;
+  }
+  /* Previene lo zoom fastidioso automatico di Safari su iOS quando si tocca un input */
+  input, select, textarea {
+    font-size: 16px !important;
   }
 }
 
