@@ -118,13 +118,13 @@ export async function decifraDatoSensibile(
     throw new Error('Struttura envelope AES-GCM incompleta');
   }
 
-  const iv = base64ToBytes(parsed.iv);
-  const salt = base64ToBytes(parsed.s);
-  const cipherBytes = base64ToBytes(parsed.c);
-
-  const chiave = await derivaChiaveAES(chiaveSegreta, salt);
-
   try {
+    const iv = base64ToBytes(parsed.iv);
+    const salt = base64ToBytes(parsed.s);
+    const cipherBytes = base64ToBytes(parsed.c);
+
+    const chiave = await derivaChiaveAES(chiaveSegreta, salt);
+
     const plainBuffer = await globalThis.crypto.subtle.decrypt(
       { name: 'AES-GCM', iv: iv as unknown as BufferSource },
       chiave,

@@ -1,10 +1,23 @@
 /**
  * Unified Security Test Loader
- * Bridges the test suite to the authoritative security contract.
- * If implementation modules exist in `src/servizi/sicurezza/index.ts`,
- * tests can dynamically compare or load them; otherwise defaults to security-oracle.
+ * Bridges the test suite directly to production security modules in `src/servizi/sicurezza`.
  */
 import * as SecurityOracle from './security-oracle';
+import {
+  StorageIntegritaSimulator,
+  verificaPermessoOperazione,
+  GestoreRateLimiting,
+  type OperazioneAziendale,
+} from './security-oracle';
 
-export * from './security-oracle';
-export { SecurityOracle };
+// Direct production exports
+export * from '@/servizi/sicurezza';
+
+// Testing simulation harnesses for M2/M3 boundary features
+export {
+  StorageIntegritaSimulator,
+  verificaPermessoOperazione,
+  GestoreRateLimiting,
+  type OperazioneAziendale,
+  SecurityOracle,
+};

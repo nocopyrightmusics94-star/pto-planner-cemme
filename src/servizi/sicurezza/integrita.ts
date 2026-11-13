@@ -35,7 +35,9 @@ export function serializzaCanonico(obj: unknown): string {
     return '[' + obj.map(serializzaCanonico).join(',') + ']';
   }
 
-  const chiavi = Object.keys(obj as Record<string, unknown>).sort();
+  const chiavi = Object.keys(obj as Record<string, unknown>)
+    .filter((c) => (obj as Record<string, unknown>)[c] !== undefined)
+    .sort();
   return (
     '{' +
     chiavi

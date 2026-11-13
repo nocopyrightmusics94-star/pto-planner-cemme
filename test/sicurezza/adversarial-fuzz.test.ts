@@ -580,8 +580,12 @@ describe('ADVERSARIAL STRESS & FUZZ TEST SUITE (Milestone 1 Challenge)', () => {
         expect(resFuture.valida).toBe(false);
         expect(resFuture.motivo).toContain('futuro');
 
-        // Expired session (> 30 min idle)
-        const expiredSession = { ...validSession, ultimoAccesso: now - (31 * 60 * 1000) };
+        // Expired session (> 30 min idle) with valid prior creation
+        const expiredSession = {
+          ...validSession,
+          timestampCreazione: now - 35 * 60 * 1000,
+          ultimoAccesso: now - 31 * 60 * 1000,
+        };
         const resExpired = validaSessione(expiredSession, now);
         expect(resExpired.valida).toBe(false);
         expect(resExpired.motivo).toContain('scaduta');
@@ -597,24 +601,23 @@ describe('ADVERSARIAL STRESS & FUZZ TEST SUITE (Milestone 1 Challenge)', () => {
   // 5. IN-DEPTH EDGE CASES, VULNERABILITY PROBING & FORENSIC CHALLENGES
   // =========================================================================
   describe('5. In-Depth Edge Cases & Vulnerability Probing', () => {
-    it('ADV-PROBE-01 [VULNERABILITY DETECTED]: hexABytes silently collapses non-hex characters to zero bytes', async () => {
+    it('ADV-PROBE-01 [REMEDIATED]: hexABytes strictly rejects non-hex characters with descriptive error', async () => {
       // Input has valid length (32 chars) but contains non-hex characters 'z'
       const nonHexSalt = 'z'.repeat(32);
       const allZeroSalt = '0'.repeat(32);
 
-      const bytesNonHex = hexABytes(nonHexSalt);
+      // Rejection: non-hex characters must throw rather than silently collapsing to 0
+      expect(() => hexABytes(nonHexSalt)).toThrow(/non valida per il salt/i);
+
+      // PBKDF2 derivation with invalid salt must reject
+      await expect(generaHashPassword('TestPass', nonHexSalt)).rejects.toThrow();
+
+      // Valid all-zero hex salt works normally
       const bytesAllZero = hexABytes(allZeroSalt);
-
-      // Observation: parseInt("zz", 16) is NaN, Uint8Array converts NaN to 0
-      expect(Array.from(bytesNonHex)).toEqual(Array.from(bytesAllZero));
-
-      // Impact: An invalid salt of 'z' produces the IDENTICAL PBKDF2 hash as a salt of '0'
-      const hash1 = await generaHashPassword('TestPass', nonHexSalt);
-      const hash2 = await generaHashPassword('TestPass', allZeroSalt);
-      expect(hash1.hash).toBe(hash2.hash);
+      expect(bytesAllZero.length).toBe(16);
     });
 
-    it('ADV-PROBE-02 [VULNERABILITY DETECTED]: validaSessione accepts future ultimoAccesso (immortal session vulnerability)', () => {
+    it('ADV-PROBE-02 [REMEDIATED]: validaSessione rejects future ultimoAccesso (immortal session protection)', () => {
       const now = 1700000000000;
       // An attacker or forged state with ultimoAccesso far in the future
       const immortalSession = {
@@ -625,11 +628,11 @@ describe('ADVERSARIAL STRESS & FUZZ TEST SUITE (Milestone 1 Challenge)', () => {
         ultimoAccesso: now + 1000 * 60 * 60 * 24 * 365, // 1 year in the future!
       };
 
-      // tempoInattivita becomes negative (-1 year), which is < timeoutMs (30 min)
-      // Because validaSessione does not check `nowTimestamp < sessione.ultimoAccesso`,
-      // this session is deemed valid indefinitely!
+      // Because validaSessione checks `sessione.ultimoAccesso > nowTimestamp`,
+      // this session is rejected with clock anomaly / future timestamp error.
       const result = validaSessione(immortalSession, now);
-      expect(result.valida).toBe(true); // Demonstrates the vulnerability exists
+      expect(result.valida).toBe(false);
+      expect(result.motivo).toMatch(/futuro|anomalo/i);
     });
 
     it('ADV-PROBE-03 [WEAKNESS DETECTED]: Schemas accept non-hex strings in hash, salt, and sigillo', () => {
@@ -698,10 +701,10 @@ describe('ADVERSARIAL STRESS & FUZZ TEST SUITE (Milestone 1 Challenge)', () => {
     it('ADV-PROBE-06: serializzaCanonico determinism with undefined properties vs JSON.stringify', () => {
       const objWithUndefined = { b: 1, a: undefined };
       const canonical = serializzaCanonico(objWithUndefined);
-      // Canonical serializer preserves the key and outputs undefined literal
-      expect(canonical).toBe('{"a":undefined,"b":1}');
+      // Canonical serializer filters undefined keys, matching standard JSON.stringify:
+      expect(canonical).toBe('{"b":1}');
 
-      // Standard JSON.stringify would omit undefined keys:
+      // Standard JSON.stringify omits undefined keys:
       expect(JSON.stringify(objWithUndefined)).toBe('{"b":1}');
     });
 

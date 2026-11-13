@@ -32,7 +32,10 @@ export function bytesAHex(bytes: Uint8Array): string {
  */
 export function hexABytes(hex: string): Uint8Array {
   if (hex.length % 2 !== 0) {
-    throw new Error('Stringa esadecimale con lunghezza dispari non valida.');
+    throw new Error('Stringa esadecimale con lunghezza dispari non valida per il salt');
+  }
+  if (!/^[0-9a-fA-F]+$/.test(hex)) {
+    throw new Error('Stringa esadecimale non valida per il salt');
   }
   const bytes = new Uint8Array(hex.length / 2);
   for (let i = 0; i < hex.length; i += 2) {

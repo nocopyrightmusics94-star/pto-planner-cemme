@@ -35,12 +35,14 @@ export const TipoAssenzaSchema: z.ZodType<TipoAssenza> = z.enum([
   'permesso_rol',
   'malattia',
   'festivo_nazionale',
+  'chiusura_aziendale',
 ]);
 
 export const StatoRichiestaSchema: z.ZodType<StatoRichiesta> = z.enum([
   'in_attesa',
   'approvata',
   'rifiutata',
+  'revocata',
 ]);
 
 /**
@@ -53,7 +55,7 @@ export const UtenzaSchema: z.ZodType<Utenza> = z
       .string()
       .min(1, 'ID utente minimo 1 carattere')
       .max(50, 'ID utente massimo 50 caratteri')
-      .regex(/^[a-zA-Z0-9._-]+$/, 'ID utente contiene caratteri non consentiti'),
+      .regex(/^[a-zA-Z0-9._-]+$/, 'ID utente deve contenere solo caratteri validi (lettere minuscole o maiuscole, numeri, punti o trattini)'),
     nomeCompleto: z.string().min(1, 'Nome minimo 1 carattere').max(100, 'Nome massimo 100 caratteri'),
     chiaveAccesso: z.string().min(1).optional(),
     chiaveAccessoHash: z.string().length(64, 'Digest password deve essere di 64 caratteri esadecimali').optional(),
@@ -75,6 +77,7 @@ export const VoceAssenzaSchema: z.ZodType<VoceAssenza> = z
     id: z.string().min(1).max(100),
     richiestaId: z.string().max(100).optional(),
     utenzaId: z.string().min(1).max(50),
+    nomeUtente: z.string().optional(),
     data: FormatoDataISO,
     tipo: TipoAssenzaSchema,
     quantita: z.number().positive().max(24, 'Quantità ore/giorni eccedente limite massimo'),
@@ -109,6 +112,8 @@ export const RichiestaAssenzaSchema: z.ZodType<RichiestaAssenza> = z
     dataInvio: z.string().min(1),
     dataDecisione: z.string().optional(),
     notaTitolare: z.string().max(1000).optional(),
+    dataRevoca: z.string().optional(),
+    motivoRevoca: z.string().optional(),
   })
   .strict();
 
@@ -175,6 +180,10 @@ export function validaSessione(
 
   if (nowTimestamp < sessione.timestampCreazione) {
     return { valida: false, motivo: 'Timestamp sessione nel futuro (orologio di sistema anomalo)' };
+  }
+
+  if (sessione.ultimoAccesso > nowTimestamp || sessione.ultimoAccesso < sessione.timestampCreazione) {
+    return { valida: false, motivo: 'Timestamp sessione nel futuro o anomalo' };
   }
 
   const tempoInattivita = nowTimestamp - sessione.ultimoAccesso;

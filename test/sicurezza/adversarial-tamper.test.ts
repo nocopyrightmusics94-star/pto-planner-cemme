@@ -341,16 +341,14 @@ describe('Adversarial Verification Suite: Storage Tamper, Canonicalization & Bou
       const canonWith = serializzaCanonico(withUndefined);
       const canonWithout = serializzaCanonico(withoutUndefined);
 
-      // Document exact canonicalization output
-      // In JS, serializzaCanonico({ a: 1, b: undefined }) produces:
-      // '{"a":1,"b":undefined}'
-      expect(canonWith).toContain('"b":undefined');
+      // Undefined keys are omitted from canonical output to align with JSON.stringify semantics
+      expect(canonWith).toBe('{"a":1}');
       expect(canonWithout).toBe('{"a":1}');
 
-      // Sealing with undefined:
+      // Sealing with undefined is identical to sealing without undefined:
       const sealWith = await calcolaSigilloIntegrita(withUndefined);
       const sealWithout = await calcolaSigilloIntegrita(withoutUndefined);
-      expect(sealWith).not.toBe(sealWithout);
+      expect(sealWith).toBe(sealWithout);
     });
 
     it('ADV-TYPE-5: Circular reference behavior examination', async () => {
@@ -477,11 +475,9 @@ describe('Adversarial Verification Suite: Storage Tamper, Canonicalization & Bou
       };
 
       const resFutureAccess = validaSessione(tamperedUltimoAccesso, now);
-      // Notice: In the current implementation:
-      // tempoInattivita = now - ultimoAccesso is negative (-31536000000).
-      // Since negative is NOT > timeoutMs (1800000), validaSessione considers it valid!
-      // This is a documented edge case: future ultimoAccesso bypasses inactivity timeout.
-      expect(resFutureAccess.valida).toBe(true);
+      // Future ultimoAccesso is rejected as anomalous clock state
+      expect(resFutureAccess.valida).toBe(false);
+      expect(resFutureAccess.motivo).toMatch(/futuro|anomalo/i);
 
       // What about ultimoAccesso before timestampCreazione?
       const tamperedPreCreation: SessioneAttiva = {
@@ -492,8 +488,9 @@ describe('Adversarial Verification Suite: Storage Tamper, Canonicalization & Bou
         ultimoAccesso: now - 20000, // accessed before creation!
       };
       const resPreCreation = validaSessione(tamperedPreCreation, now);
-      // Valid because now - ultimoAccesso = 20000 <= 1800000
-      expect(resPreCreation.valida).toBe(true);
+      // Anomaly detected: accessed before creation
+      expect(resPreCreation.valida).toBe(false);
+      expect(resPreCreation.motivo).toMatch(/futuro|anomalo/i);
     });
 
     it('ADV-STORAGE-UNDEF: Storage roundtrip with optional undefined property', async () => {
@@ -513,12 +510,10 @@ describe('Adversarial Verification Suite: Storage Tamper, Canonicalization & Bou
       // 3. Verify seal against loaded object:
       const isValid = await verificaSigilloIntegrita(loadedFromStorage, sealOnInMemory);
 
-      // Because serializzaCanonico({ id: 'u_100', reparto: undefined }) emitted '"reparto":undefined',
-      // while serializzaCanonico({ id: 'u_100' }) emits '{"id":"u_100"}',
-      // the HMAC seal calculated before storage does NOT match the HMAC seal calculated after JSON storage roundtrip!
-      expect(serializzaCanonico(originalRecord)).toBe('{"id":"u_100","reparto":undefined}');
+      // Because serializzaCanonico filters undefined properties, both emit '{"id":"u_100"}'
+      expect(serializzaCanonico(originalRecord)).toBe('{"id":"u_100"}');
       expect(serializzaCanonico(loadedFromStorage)).toBe('{"id":"u_100"}');
-      expect(isValid).toBe(false);
+      expect(isValid).toBe(true);
     });
 
     it('ADV-ARRAY-UNDEF: Array containing undefined elements produces non-standard JSON', () => {
